@@ -19,6 +19,7 @@ end_zoom = 10
 smallest_tiles = []  # here we save the smallest generated tiles for each region
 all_generated_tiles = []
 futures = {}
+running_futures = 0
 
 
 def process_asyc(tile: List[int], parent_tile: List[int]):
@@ -43,6 +44,11 @@ def get_tile_path(tile: List[int]) -> Path:
     return Path("{}/{}_{}_{}.pbf".format(path, tile[2], tile[0], tile[1]))
 
 
+def future_finished(future):
+    global running_futures
+    running_futures -= 1
+
+
 def enqueue_children(tile):
     if tile[2] >= end_zoom:
         return
@@ -58,7 +64,11 @@ def enqueue_children(tile):
             print("Do not build {} because parent is older".format(child))
         else:
             print("Enqueue {}".format(child))
-            futures[executor.submit(process_asyc, child, tile)] = child
+            future = executor.submit(process_asyc, child, tile)
+            global running_futures
+            running_futures += 1
+            future.add_done_callback(future_finished)
+            futures[future] = child
 
 
 def enqueue_initial():
@@ -84,14 +94,15 @@ def check_finished():
 if __name__ == '__main__':
     enqueue_initial()
     try:
-        while futures:
-            print("Queue length: {}".format(len(futures)))
+        while running_futures:
+            print("Queue length: {}".format(running_futures))
             time.sleep(600)
             check_finished()
     except KeyboardInterrupt:
         executor.shutdown()
         raise
-    print(smallest_tiles)
+    executor.shutdown()
+    print("Build {} tiles, {} in the smalest set".format(len(all_generated_tiles), len(smallest_tiles)))
     with open(generated_tiles_file, 'w') as fp:
         json.dump({'all': all_generated_tiles, 'smallest': smallest_tiles}, fp)
     print("Finished")
