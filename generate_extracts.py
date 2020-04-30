@@ -3,10 +3,8 @@ import os
 import argparse
 import subprocess
 import mercantile
-import tqdm
-from multiprocessing.pool import Pool, ThreadPool
+from multiprocessing.pool import ThreadPool
 from pathlib import Path
-from tqdm import tqdm
 
 
 def parse_args() -> argparse.Namespace:
@@ -84,17 +82,14 @@ def extract(working_dir: Path, out_dir: Path, target_size: int):
 
     subprocess.run(['ln', '-sf', (working_dir / 'source.osm.pbf').absolute(), (working_dir / '0_0_0.pbf').absolute()])
 
-    with tqdm(total=sum([2**(2*i) for i in range(1, 10)]), disable=True) as pbar:
-        for z in range(1, 10):
-            with ThreadPool(processes=max(os.cpu_count() - 2, 1)) as pool:
-                for x in range(0, (2**z)):
-                    for y in range(0, (2**z)):
-                        pbar.update(1)
-
-                        tile = mercantile.Tile(x, y, z)
-                        pool.apply_async(_process_tile, [working_dir, out_dir, target_size, tile])
-                pool.close()
-                pool.join()
+    for z in range(1, 10):
+        with ThreadPool(processes=max(os.cpu_count() - 2, 1)) as pool:
+            for x in range(0, (2**z)):
+                for y in range(0, (2**z)):
+                    tile = mercantile.Tile(x, y, z)
+                    pool.apply_async(_process_tile, [working_dir, out_dir, target_size, tile])
+            pool.close()
+            pool.join()
 
 
 if __name__ == '__main__':
