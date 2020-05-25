@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 import os
+import sys
 import argparse
 import subprocess
 import time
@@ -8,6 +9,21 @@ import mercantile
 from multiprocessing import Lock
 from concurrent.futures import ThreadPoolExecutor, Future
 from pathlib import Path
+
+
+class Colors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+
+def print_error(m: str):
+    print(f'{Colors.FAIL}{m}{Colors.ENDC}', file=sys.stderr)
 
 
 class Program:
@@ -33,7 +49,11 @@ class Program:
         parser.add_argument('-o', '--output-dir', dest='output_dir', type=directory_type,
                             default=os.path.join(os.path.dirname(__file__), 'out'))
         parser.add_argument('-s', '--target-size', dest='target_size', default=1.5 * 10 ** 9, type=int,
-                            help='Target size which the split files should have')
+                            help='Target files will not be larger than this size in bytes')
+        parser.add_argument('-z', '--max-zoom', dest='max_zoom', default=9, type=int,
+                            help='Maximum zoom level above which no further splitting will be performed')
+        parser.add_argument('--processes', default=(max(1, os.cpu_count() - 2)), type=int,
+                            help='How many concurrent processes to use')
         return parser.parse_args()
 
     def __init__(self):
@@ -41,12 +61,13 @@ class Program:
         self.working_dir = args.working_dir
         self.out_dir = args.output_dir
         self.target_size = args.target_size
+        self.max_zoom = args.max_zoom
         self.planet_dump_url = args.planet_dump
 
         self.running_futures = 0
         self.lock_running_futures = Lock()
 
-        self.executor = ThreadPoolExecutor(max_workers=(max(1, os.cpu_count() - 2)))
+        self.executor = ThreadPoolExecutor(max_workers=args.processes)
 
     def run(self):
         self.download_planet_dump()
@@ -81,15 +102,15 @@ class Program:
         box = mercantile.bounds(tile)
         parent = mercantile.parent(tile)
 
-        parent_file = self.working_dir / f'{parent[2]}_{parent[0]}_{parent[1]}.pbf'
-        target_file = self.working_dir / f'{tile[2]}_{tile[0]}_{tile[1]}.pbf'
+        parent_file = self.working_dir / f'{parent.z}_{parent.x}_{parent.y}.pbf'
+        target_file = self.working_dir / f'{tile.z}_{tile.x}_{tile.y}.pbf'
 
+        # these cases should not be hit but we check them regardless
         if not parent_file.exists():
-            print(f'Not generating {tile} because parent does not exist')
+            print_error(f'Not generating {tile} because parent does not exist')
             return
-
         if parent_file.stat().st_size < self.target_size:
-            print(f'Not generating {tile} because parent has reached target size')
+            print_error(f'Not generating {tile} because parent has reached target size')
             return
 
         if not target_file.exists() or parent_file.stat().st_mtime > target_file.stat().st_mtime:
@@ -110,8 +131,8 @@ class Program:
             print(f'{tile} already exists and is current. skipping')
 
         if target_file.stat().st_size < self.target_size:
-            print(f'{tile} has reached target size')
-            os.rename(str(target_file), str(self.out_dir / f'{tile[2]}_{tile[0]}_{tile[1]}.pbf'))
+            print(f'{Colors.OKGREEN}{tile} has reached target size{Colors.ENDC}')
+            subprocess.run(['rsync', str(target_file.absolute()), str(self.out_dir)], check=True)
         else:
             self.extract(tile)
 
@@ -128,12 +149,12 @@ class Program:
         has been reached.
         """
         z = source.z + 1
-        if z >= 10:
-            print(f'Asked to extract tiles from {source} but zoom level has reached maximum')
+        if z > self.max_zoom:
+            print_error(f'Asked to split up {source} but zoom level has reached maximum of {self.max_zoom}')
             return
 
-        for x in range(source.x, source.x + 2):
-            for y in range(source.y, source.y + 2):
+        for x in [source.x * 2, source.x * 2 + 1]:
+            for y in [source.y * 2, source.y * 2 + 1]:
                 tile = mercantile.Tile(x, y, z)
 
                 future = self.executor.submit(self._generate_tile, tile)
