@@ -8,9 +8,9 @@ RUN apt install -y --no-install-recommends pipenv osmctools rsync
 ADD Pipfile Pipfile.lock /app/src/
 WORKDIR /app/src
 RUN pipenv install --system --deploy --ignore-pipfile
-ADD generate_extracts.py /app/src/
+ADD osm_tile_data_extract /app/
 
 # add image metadata
 VOLUME /app/tmp
 VOLUME /app/out
-ENTRYPOINT ["/app/src/generate_extracts.py", "-w", "/app/tmp", "-o", "/app/out"]
+ENTRYPOINT ["/app/src/main.py", "-w", "/app/tmp", "-o", "/app/out"]

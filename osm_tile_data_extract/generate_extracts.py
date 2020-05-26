@@ -1,6 +1,4 @@
-#! /usr/bin/env python3
 import os
-import sys
 import argparse
 import subprocess
 import time
@@ -9,55 +7,23 @@ import mercantile
 from multiprocessing import Lock
 from concurrent.futures import ThreadPoolExecutor, Future
 from pathlib import Path
-
-
-class Colors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-
-
-def print_error(m: str):
-    print(f'{Colors.FAIL}{m}{Colors.ENDC}', file=sys.stderr)
+from .util import *
 
 
 class Program:
     @staticmethod
-    def parse_args() -> argparse.Namespace:
-        def directory_type(raw: str):
-            p = Path(raw)
-            p.mkdir(exist_ok=True)
-            if not p.is_dir():
-                raise argparse.ArgumentTypeError(f'Path {raw} is not a directory')
-            return p
-
-        parser = argparse.ArgumentParser('generate_extracts',
-                                         description='Extract similarly sized files from the latest OpenStreetMap '
-                                                     'Planet dump.')
+    def add_args(parser: argparse.ArgumentParser):
         parser.add_argument('-p', '--planet-dump', dest='planet_dump',
                             default='https://planet.openstreetmap.org/pbf/planet-latest.osm.pbf',
                             help='Url of the source pbf file')
-        parser.add_argument('-w', '--working-dir', dest='working_dir', type=directory_type,
-                            default=os.path.join(os.path.dirname(__file__), 'tmp'),
-                            help='Working directory to which the planet dump gets downloaded and in which intermediate '
-                                 'split files are stored.')
-        parser.add_argument('-o', '--output-dir', dest='output_dir', type=directory_type,
-                            default=os.path.join(os.path.dirname(__file__), 'out'))
         parser.add_argument('-s', '--target-size', dest='target_size', default=1.5 * 10 ** 9, type=int,
                             help='Target files will not be larger than this size in bytes')
         parser.add_argument('-z', '--max-zoom', dest='max_zoom', default=9, type=int,
                             help='Maximum zoom level above which no further splitting will be performed')
         parser.add_argument('--processes', default=(max(1, os.cpu_count() - 2)), type=int,
                             help='How many concurrent processes to use')
-        return parser.parse_args()
 
-    def __init__(self):
-        args = self.parse_args()
+    def __init__(self, args: argparse.Namespace):
         self.working_dir = args.working_dir
         self.out_dir = args.output_dir
         self.target_size = args.target_size
@@ -161,8 +127,3 @@ class Program:
                 with self.lock_running_futures:
                     self.running_futures += 1
                 future.add_done_callback(lambda result: self._on_future_done(result))
-
-
-if __name__ == '__main__':
-    p = Program()
-    p.run()
