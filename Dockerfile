@@ -2,7 +2,7 @@ FROM docker.io/debian:buster-slim
 
 # install dependencies
 RUN apt update
-RUN apt install -y --no-install-recommends pipenv osmctools rsync
+RUN apt install -y --no-install-recommends pipenv osmctools rsync curl
 
 # add sources
 ADD Pipfile Pipfile.lock /app/src/

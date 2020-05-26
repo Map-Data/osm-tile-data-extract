@@ -4,8 +4,11 @@ import sys
 import argparse
 import subprocess
 import time
-
+import requests
+import json
 import mercantile
+
+from requests.auth import HTTPBasicAuth
 from multiprocessing import Lock
 from concurrent.futures import ThreadPoolExecutor, Future
 from pathlib import Path
@@ -36,6 +39,11 @@ class Program:
                 raise argparse.ArgumentTypeError(f'Path {raw} is not a directory')
             return p
 
+        def auth_type(raw: str) -> list:
+            if raw != '' and ':' not in raw and len(raw.split(':')) != 2:
+                raise argparse.ArgumentTypeError(f'Authentication has incorrect format. Use <username>:<password>')
+            return raw.split(':')
+
         parser = argparse.ArgumentParser('generate_extracts',
                                          description='Extract similarly sized files from the latest OpenStreetMap '
                                                      'Planet dump.')
@@ -54,6 +62,16 @@ class Program:
                             help='Maximum zoom level above which no further splitting will be performed')
         parser.add_argument('--processes', default=(max(1, os.cpu_count() - 2)), type=int,
                             help='How many concurrent processes to use')
+
+        upload_group = parser.add_argument_group(title='Uploading',
+                                                 description='Finished PBF extracts can be uploaded to a '
+                                                             'tileserver-mapping. Use these arguments to do so and '
+                                                             'configure how.')
+        upload_group.add_argument('--upload-url', dest='upload_url', type=str, default='',
+                                  help='Upload to the tileserver-mapping server located at under this url.')
+        upload_group.add_argument('--upload-auth', dest='upload_auth', type=auth_type, default='',
+                                  help='<username>:<password> combination used to authenticate the upload.')
+
         return parser.parse_args()
 
     def __init__(self):
@@ -67,7 +85,14 @@ class Program:
         self.running_futures = 0
         self.lock_running_futures = Lock()
 
+        self.upload_url = args.upload_url
+        self.upload_auth = args.upload_auth
+
         self.executor = ThreadPoolExecutor(max_workers=args.processes)
+
+    @property
+    def should_upload(self):
+        return self.upload_url != '' and self.upload_auth != ''
 
     def run(self):
         self.download_planet_dump()
@@ -95,6 +120,8 @@ class Program:
 
         If the tile is smaller than the intended target size it is considered done and moved to the out_dir.
         If not, additional jobs are scheduled to further break it down.
+
+        If uploading is configured, the results get uploaded to tileserver-mapping as well.
 
         :param tile: Target tile which should be generated
         """
@@ -132,7 +159,7 @@ class Program:
 
         if target_file.stat().st_size < self.target_size:
             print(f'{Colors.OKGREEN}{tile} has reached target size{Colors.ENDC}')
-            subprocess.run(['rsync', str(target_file.absolute()), str(self.out_dir)], check=True)
+            self.finish_file(target_file, tile)
         else:
             self.extract(tile)
 
@@ -161,6 +188,44 @@ class Program:
                 with self.lock_running_futures:
                     self.running_futures += 1
                 future.add_done_callback(lambda result: self._on_future_done(result))
+
+    def finish_file(self, file: Path, tile: mercantile.Tile):
+        """
+        Do finishing steps for the given file.
+        This includes copying the file to the output directory or uploading it toe a tileserver-mapping server.
+
+        :param file: File which should be processed
+        :param tile: Tile object whose data this file contains
+        """
+        subprocess.run(['rsync', str(file.absolute()), str(self.out_dir)], check=True)
+
+        if self.should_upload:
+            # check if a server object already describes this tile
+            existing_dumps = json.loads(requests.get(f'{self.upload_url}/api/v1/planet_dumps/').content)
+            target_dumps = [i for i in existing_dumps if i['x'] == tile.x and i['y'] == tile.y and i['z'] == tile.z]
+
+            if len(target_dumps) == 0:
+                # if no corresponding dump objects exists on the server, we need to create one
+                response = json.loads(requests.post(f'{self.upload_url}/api/v1/planet_dumps/', headers={
+                    'Content-Type': 'application/json'
+                }, data=json.dumps({
+                    'x': tile.x,
+                    'y': tile.y,
+                    'z': tile.z,
+                }), auth=HTTPBasicAuth(username=self.upload_auth[0], password=self.upload_auth[1])).content)
+                dump_id = response['id']
+            else:
+                dump_id = target_dumps[0]['id']
+
+            # update only the file of the existing dump object on the server
+            subprocess.run([
+                'curl',
+                '-u', f'{self.upload_auth[0]}:{self.upload_auth[1]}',
+                '-F', f'file=@{file.absolute()}',
+                '--request', 'PATCH',
+                '--silent',
+                f'{self.upload_url}/api/v1/planet_dumps/{dump_id}/'
+            ], check=True, stdout=subprocess.DEVNULL)
 
 
 if __name__ == '__main__':
