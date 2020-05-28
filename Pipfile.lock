@@ -1,10 +1,12 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "c5b2df15a2404ad773e5040c1463106962e9a25ffb37cae9b1d9f8570aa0721e"
+            "sha256": "2a608c5ef27ce533242f3f379b6e0eed5feb5fbf5e5f17aadb396744c0ca7e0d"
         },
         "pipfile-spec": 6,
-        "requires": {},
+        "requires": {
+            "python_version": "3"
+        },
         "sources": [
             {
                 "name": "pypi",
@@ -102,10 +104,6 @@
             "index": "pypi",
             "version": "==0.2.1"
         },
-        "tileserver": {
-            "git": "https://github.com/tilezen/tileserver.git",
-            "ref": "v2.2.0"
-        },
         "urllib3": {
             "hashes": [
                 "sha256:3018294ebefce6572a474f0604c2021e33b3fd8006ecd11d62107a5d2a963527",
@@ -118,10 +116,6 @@
                 "sha256:784719dc5f780be319cdd185dc85dd93afebdb6ebb943811bc4c7c5f9c72aeaf"
             ],
             "version": "==1.3"
-        },
-        "vector-datasource": {
-            "git": "https://github.com/mapzen/vector-datasource.git",
-            "ref": "v1.8.0"
         },
         "websocket-client": {
             "hashes": [

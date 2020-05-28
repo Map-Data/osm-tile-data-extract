@@ -1,3 +1,6 @@
+[requires]
+python_version = "3"
+
 [[source]]
 name = "pypi"
 url = "https://pypi.org/simple"
@@ -10,12 +13,3 @@ ipython = "*"
 mercantile = "*"
 swaggerpy = "*"
 pyswagger = "*"
-#psycopg2-binary = "*"
-
-[packages.tileserver]
-git = "https://github.com/tilezen/tileserver.git"
-ref = "v2.2.0"
-
-[packages.vector-datasource]
-git = "https://github.com/mapzen/vector-datasource.git"
-ref = "v1.8.0"

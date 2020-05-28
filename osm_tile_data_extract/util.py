@@ -17,6 +17,10 @@ class Colors:
     UNDERLINE = '\033[4m'
 
 
+def print_stage(m: str):
+    print(f'{Colors.OKBLUE}-----> {m}{Colors.ENDC}')
+
+
 def print_error(m: str):
     print(f'{Colors.FAIL}{m}{Colors.ENDC}', file=sys.stderr)
 
