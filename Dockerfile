@@ -5,7 +5,8 @@ ARG PG_VERSION=11
 ENV PG_VERSION=${PG_VERSION}
 RUN apt update
 RUN apt install -y --no-install-recommends python3 python pipenv python3-setuptools python3-dev python-wheel \
-    python-setuptools python-pip rsync postgresql-${PG_VERSION} osmctools osm2pgsql git libpq-dev gcc make unzip postgis
+    python-setuptools python-pip rsync postgresql-${PG_VERSION} osmctools osm2pgsql git libpq-dev gcc make unzip \
+    postgis curl
 RUN apt install -y postgresql-${PG_VERSION}-postgis
 
 RUN pg_dropcluster --stop ${PG_VERSION} main

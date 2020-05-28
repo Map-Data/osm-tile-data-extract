@@ -30,7 +30,7 @@ class Program:
                             help='z coordinate of tile to import')
 
     def __init__(self, args: argparse.Namespace):
-        self.api = ApiClient(args.mapping_url, args.mapping_auth)
+        self.api = ApiClient(args.mapping_url, args.mapping_auth[0], args.mapping_auth[1])
         self.tile = mercantile.Tile(args.x, args.y, args.z)
 
         self.working_dir = os.path.abspath(args.working_dir)
@@ -125,6 +125,5 @@ class Program:
     def _upload_dump(self):
         print_stage('Uploading PostgreSQL dump to tileserver-mapping')
         file_path = os.path.join(self.working_dir, 'db.pg_dump')
-
-
-# /app/src/osm_tile_data_extract/main.py -w /app/tmp -o /app/out import-extracts --mapping-url http://localhost:8000 --mapping-auth ftsell:foobar123 -z 2 -x 0 -y 3
+        self.api.upload_sql_dump(self.tile, file_path)
+        subprocess.run(['rsync', file_path, self.out_dir], check=True)
