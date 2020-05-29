@@ -34,6 +34,7 @@ class Program:
         self.lock_running_futures = Lock()
 
         self.executor = ThreadPoolExecutor(max_workers=args.processes)
+        self.api = ApiClient(args.mapping_url, args.mapping_auth[0], args.mapping_auth[1])
 
     def run(self):
         self.download_planet_dump()
@@ -98,6 +99,7 @@ class Program:
 
         if target_file.stat().st_size < self.target_size:
             print(f'{Colors.OKGREEN}{tile} has reached target size{Colors.ENDC}')
+            self.api.upload_planet_dump(tile, str(target_file.absolute()))
             subprocess.run(['rsync', str(target_file.absolute()), str(self.out_dir)], check=True)
         else:
             self.extract(tile)

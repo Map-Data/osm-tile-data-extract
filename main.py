@@ -16,12 +16,21 @@ def parse_args() -> argparse.Namespace:
             raise argparse.ArgumentTypeError(f'Path {raw} is not a directory')
         return p
 
+    def auth_type(raw: str) -> list:
+        if ':' not in raw or len(raw.split(':')) != 2:
+            raise argparse.ArgumentTypeError('Authentication has invalid format')
+        return raw.split(':')
+
     parser = argparse.ArgumentParser('osm-tile-data-extract')
     parser.add_argument('-w', '--working-dir', dest='working_dir', type=directory_type,
                         default=os.path.join(os.path.dirname(__file__), 'tmp'),
                         help='Working directory in which intermediate and temporary files are stored')
     parser.add_argument('-o', '--output-dir', dest='output_dir', type=directory_type,
                         default=os.path.join(os.path.dirname(__file__), 'out'))
+    parser.add_argument('--mapping-url', dest='mapping_url', type=str, required=True,
+                        help='Base URL under which a tileserver-mapping server is reachable')
+    parser.add_argument('--mapping-auth', dest='mapping_auth', type=auth_type, required=True,
+                        help='<username>:<password> combination used to authenticate at the tileserver-mapping')
 
     sub_parsers = parser.add_subparsers(dest='command')
     GenerateExtracts.add_args(sub_parsers.add_parser('generate-extracts',

@@ -13,15 +13,6 @@ PG_VERSION = os.environ.get('PG_VERSION')
 class Program:
     @staticmethod
     def add_args(parser: argparse.ArgumentParser):
-        def auth_type(raw: str) -> list:
-            if ':' not in raw or len(raw.split(':')) != 2:
-                raise argparse.ArgumentTypeError('Authentication has invalid format')
-            return raw.split(':')
-
-        parser.add_argument('--mapping-url', dest='mapping_url', type=str, required=True,
-                            help='Base URL under which a tileserver-mapping server is reachable')
-        parser.add_argument('--mapping-auth', dest='mapping_auth', type=auth_type, required=True,
-                            help='<username>:<password> combination used to authenticate at the tileserver-mapping')
         parser.add_argument('-x', type=int, required=True,
                             help='X coordinate of tile to import')
         parser.add_argument('-y', type=int, required=True,
